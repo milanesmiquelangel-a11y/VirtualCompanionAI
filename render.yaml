@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: virtual-companion-ai-backend
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install --omit=dev
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: AI_API_URL
+        sync: false
+      - key: AI_API_KEY
+        sync: false
+      - key: AI_MODEL
+        value: gpt-4o-mini
+      - key: ALLOWED_ORIGIN
+        sync: false
+      - key: RATE_LIMIT
+        value: "30"
