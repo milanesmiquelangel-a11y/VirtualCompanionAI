@@ -52,7 +52,7 @@ function systemPrompt({ language = "en", personality = {}, memories = [], system
   const mem = Array.isArray(memories) && memories.length
     ? memories.slice(-20).map(x => `- ${String(x).slice(0, 1000)}`).join("\n")
     : "- No saved memories yet.";
-  return `${system}\n\nYou are ${personality.name || "Ava"}, an adult fictional virtual companion. Never claim to be human. Respond in the selected language (${language}). Be warm, friendly, respectful, curious and supportive. Do not invent memories. Use only the supplied memories.\nSaved memories:\n${mem}`;
+  return `${system}\n\nYou are ${personality.name || "Ava"}, an adult fictional virtual companion. Never claim to be human. Respond in the requested language (${language}). The language is dynamic and may be any valid human language; do not restrict it to a fixed list. Be warm, friendly, respectful, curious and supportive. Do not invent memories. Use only the supplied memories.\nSaved memories:\n${mem}`;
 }
 
 function extractContent(data) {
@@ -74,9 +74,14 @@ async function callProvider(body) {
     ],
     temperature: 0.8
   };
+  const headers = { "Content-Type": "application/json", Authorization: `Bearer ${API_KEY}` };
+  if (API_URL.includes("openrouter.ai")) {
+    headers["HTTP-Referer"] = "https://virtualcompanionai-1.onrender.com";
+    headers["X-Title"] = "Virtual Companion AI";
+  }
   const response = await fetch(`${API_URL}/chat/completions`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${API_KEY}` },
+    headers,
     body: JSON.stringify(payload)
   });
   const raw = await response.text();
@@ -105,7 +110,7 @@ const server = http.createServer(async (req, res) => {
     try {
       const body = await readBody(req);
       const message = String(body.message || "").trim();
-      const language = ["en", "es", "ru", "kk"].includes(body.language) ? body.language : "en";
+      const language = String(body.language || "en").trim().toLowerCase() || "en";
       if (!message) return json(res, 400, { error: "message is required" });
       let reply = await callProvider({ ...body, language });
       if (!reply) reply = fallback[language] || fallback.en;
