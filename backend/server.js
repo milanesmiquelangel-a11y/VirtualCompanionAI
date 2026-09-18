@@ -1,9 +1,9 @@
 import http from "node:http";
 
 const PORT = Number(process.env.PORT || 10000);
-const API_URL = (process.env.AI_API_URL || "").replace(/\/$/, "");
+const API_URL = (process.env.AI_API_URL || "https://openrouter.ai/api/v1").replace(/\/$/, "");
 const API_KEY = process.env.AI_API_KEY || "";
-const MODEL = process.env.AI_MODEL || "gpt-4o-mini";
+const MODEL = process.env.AI_MODEL || "openrouter/free";
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "*";
 const MAX_BODY_BYTES = Number(process.env.MAX_BODY_BYTES || 1_000_000);
 const RATE_LIMIT = Number(process.env.RATE_LIMIT || 30);
