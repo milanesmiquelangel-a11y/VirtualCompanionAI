@@ -1,0 +1,3 @@
+import * as THREE from "three";
+export const SCENE_PRESETS={sala:{background:"#eef4ff",platform:"#eef1f6",ring:"#6b7a99"},cocina:{background:"#f0faf4",platform:"#e8f2ec",ring:"#6f9977"},dormitorio:{background:"#f4ecff",platform:"#e9e2f2",ring:"#8b7aa8"},vestidor:{background:"#fdf0f4",platform:"#f4e8ec",ring:"#a88b96"},bano:{background:"#e8f7fb",platform:"#e2f0f4",ring:"#7a99a8"},exterior:{background:"#e8f4ff",platform:"#dfeedd",ring:"#5f9968"}};
+export function applyScene(preset,{scene,platform,platformRing}){if(!preset)return;scene.background=new THREE.Color(preset.background);if(platform)platform.material.color.set(preset.platform);if(platformRing)platformRing.material.color.set(preset.ring);}
