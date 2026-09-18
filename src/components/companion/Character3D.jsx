@@ -17,7 +17,7 @@ const Character3D=forwardRef(function Character3D({className="",characterId=DEFA
  const mountRef=useRef(null),propsRef=useRef({characterId,appearance,wardrobe,emotion,activity,scene,speaking,mouthIntensity,onCapabilities}),apiRef=useRef(null),exportRef=useRef(null);
  const[loading,setLoading]=useState(true),[pending,setPending]=useState(false);
  useEffect(()=>{propsRef.current={characterId,appearance,wardrobe,emotion,activity,scene,speaking,mouthIntensity,onCapabilities};});
- useImperativeHandle(ref,()=>({exportModel:f=>exportRef.current?.(f)}));
+ useImperativeHandle(ref,()=>({exportModel:f=>exportRef.current?.(f),zoomToFace:()=>apiRef.current?.zoomToFace(),resetCamera:()=>apiRef.current?.resetCamera()}));
  useEffect(()=>{
   const mount=mountRef.current;if(!mount)return;let cancelled=false,model=null,env=null,animation=null,emotionCtl=null;
   const scene3=new THREE.Scene(),w=mount.clientWidth||640,h=mount.clientHeight||480;
@@ -30,7 +30,7 @@ const Character3D=forwardRef(function Character3D({className="",characterId=DEFA
   const fill=new THREE.DirectionalLight(0xffd9c0,.4);fill.position.set(-2,1.5,3);scene3.add(fill);
   const platform=new THREE.Mesh(new THREE.CylinderGeometry(1.4,1.55,.1,64),new THREE.MeshStandardMaterial({color:0xeef1f6,roughness:.4,metalness:.1}));platform.position.y=-.05;platform.receiveShadow=true;scene3.add(platform);
   const ring=new THREE.Mesh(new THREE.TorusGeometry(1.42,.018,16,64),new THREE.MeshStandardMaterial({color:0x6b7a99,metalness:.6,roughness:.3}));ring.rotation.x=Math.PI/2;scene3.add(ring);
-  const morphMeshes=[],wardrobe={top:[],pants:[],dress:[],sport:[],formal:[],shoes:[],accessories:[]},tints={hair:[],top:[],bottom:[]},bones={},rest={};let restHipsY=0;
+  const morphMeshes=[],wardrobe={top:[],pants:[],dress:[],sport:[],formal:[],shoes:[],accessories:[]},tints={hair:[],top:[],bottom:[]},bones={},rest={};let restHipsY=0;let modelBounds=null;
   let clips=[];const mouse={x:0,y:0,tx:0,ty:0};const wave={active:false,t:0};const clock=new THREE.Clock();
   const applySceneNow=()=>{if(env){scene3.remove(env);env.traverse(o=>{o.geometry?.dispose();if(o.material){Array.isArray(o.material)?o.material.forEach(m=>m.dispose()):o.material.dispose();}});}const id=propsRef.current.scene||"sala";applyScene(SCENE_PRESETS[id]||SCENE_PRESETS.sala,{scene:scene3,platform,platformRing:ring});env=buildSceneEnvironment(id);if(env)scene3.add(env);};
   applySceneNow();
@@ -43,9 +43,9 @@ const Character3D=forwardRef(function Character3D({className="",characterId=DEFA
    const applyWardrobe=()=>Object.entries(wardrobe).forEach(([slot,ms])=>{const cfg=propsRef.current.wardrobe?.[slot]||{};ms.forEach(m=>m.visible=cfg.equipped!==false);});
    const setEmotion=()=>emotionCtl.setEmotion(propsRef.current.emotion||"CALM");
    const applyActivity=()=>{const r=act.apply(propsRef.current.activity||"idle",{wave:()=>{wave.active=true;wave.t=0}});if(r.mode!=="clip")Object.keys(rest).forEach(n=>bones[n]?.rotation.copy(rest[n]));};
-   apiRef.current={applyTints,applyWardrobe,setEmotion,applyActivity};applyTints();applyWardrobe();setEmotion();applyActivity();
+   const resetCamera=()=>{camera.position.set(0,1.45,3);controls.target.set(0,1,0);controls.update();};const zoomToFace=()=>{if(!modelBounds)return;const center=modelBounds.getCenter(new THREE.Vector3()),size=modelBounds.getSize(new THREE.Vector3());const faceY=modelBounds.min.y+size.y*.84;controls.target.set(center.x,faceY,center.z);camera.position.set(center.x,faceY+.08,center.z+Math.max(.72,size.y*.48));controls.minDistance=.45;controls.maxDistance=7;controls.update();};apiRef.current={applyTints,applyWardrobe,setEmotion,applyActivity,zoomToFace,resetCamera};applyTints();applyWardrobe();setEmotion();applyActivity();
    onCapabilities?.({hasModel:true,clips:clips.map(x=>x.name).filter(Boolean),morphs:{smile:morphMeshes.some(m=>findMorph(m.morphTargetDictionary,["mouthsmile"])),frown:morphMeshes.some(m=>findMorph(m.morphTargetDictionary,["mouthfrown"])),jawOpen:morphMeshes.some(m=>findMorph(m.morphTargetDictionary,["jawopen","mouthopen","viseme_aa","visemea"])),blink:morphMeshes.some(m=>findMorph(m.morphTargetDictionary,["eyeblink"]))},wardrobe:Object.fromEntries(Object.entries(wardrobe).map(([k,v])=>[k,v.length>0]))});
-   scene3.add(model);setLoading(false);setPending(false);
+   scene3.add(model);modelBounds=b.clone();setLoading(false);setPending(false);
   };
   const failed=()=>{if(cancelled)return;setLoading(false);setPending(true);onCapabilities?.({hasModel:false,clips:[],morphs:{},wardrobe:{}})};loader.load(selected.url,onLoad,undefined,failed);
   const onMove=e=>{const r=dom.getBoundingClientRect();mouse.tx=(e.clientX-r.left)/r.width*2-1;mouse.ty=-((e.clientY-r.top)/r.height*2-1)};window.addEventListener("mousemove",onMove);
