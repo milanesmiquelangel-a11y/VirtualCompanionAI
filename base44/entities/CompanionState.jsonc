@@ -1,0 +1,35 @@
+{
+  "name": "CompanionState",
+  "type": "object",
+  "description": "Estado persistente del personaje 3D del Companion: apariencia, vestuario, emoción, actividad y escenario.",
+  "properties": {
+    "anonymous_device_id": {
+      "type": "string",
+      "description": "Identificador técnico anónimo del dispositivo; no es una cuenta de usuario."
+    },
+    "appearance": {
+      "type": "object",
+      "description": "Colores de apariencia aplicados (hairColor, topColor, bottomColor)."
+    },
+    "wardrobe": {
+      "type": "object",
+      "description": "Estado del vestuario por prenda: { slot: { equipped, color } }."
+    },
+    "emotion": {
+      "type": "string",
+      "description": "Emocion actual del Companion.",
+      "enum": ["HAPPY","CALM","EXCITED","SAD","PLAYFUL"],
+      "default": "CALM"
+    },
+    "activity": {
+      "type": "string",
+      "description": "Actividad actual (cocinar, comer, caminar, leer, descansar, dormir, bailar, relajarse, saludar, idle).",
+      "default": "idle"
+    },
+    "scene": {
+      "type": "string",
+      "description": "Escenario actual (sala, cocina, dormitorio, vestidor, bano, exterior).",
+      "default": "sala"
+    }
+  }
+}
