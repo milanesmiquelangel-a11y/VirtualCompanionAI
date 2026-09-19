@@ -1,6 +1,6 @@
 export const MODEL_URL="/models/companion-female.fbx";
 export const FALLBACK_MODEL_URL="/models/companion-female.fbx";
-export const CHARACTER_MODELS={female:{id:"female",label:"Compañera",description:"Humana digital realista CC0",url:"/models/companion-female.fbx",format:"fbx"male:{id:"male",label:"Compañero",description:"Avatar masculino adulto",url:"/models/companion-male.glb",format:"glb"}};
+export const CHARACTER_MODELS={female:{id:"female",label:"Compañera",description:"Humana digital realista CC0",url:"/models/companion-female.fbx",format:"fbx"},male:{id:"male",label:"Compañero",description:"Avatar masculino adulto",url:"/models/companion-male.glb",format:"glb"}};
 export const DEFAULT_CHARACTER_ID="female";
 export const CHARACTER_AGE=25;
 export const MIN_AGE=18;
