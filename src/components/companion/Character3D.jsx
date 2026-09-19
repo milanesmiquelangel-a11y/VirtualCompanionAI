@@ -1,61 +1,52 @@
-import {forwardRef,useEffect,useImperativeHandle,useRef,useState} from "react";
-import * as THREE from "three";
-import {GLTFLoader} from "three/examples/jsm/loaders/GLTFLoader.js";
-import {FBXLoader} from "three/examples/jsm/loaders/FBXLoader.js";
-import {GLTFExporter} from "three/examples/jsm/exporters/GLTFExporter.js";
-import {OrbitControls} from "three/examples/jsm/controls/OrbitControls.js";
-import {CHARACTER_MODELS,DEFAULT_CHARACTER_ID} from "@/lib/companion/companionConfig";
-import {AnimationController} from "@/lib/companion/AnimationController";
-import {ActivityController} from "@/lib/companion/ActivityController";
-import {EmotionController,findMorph} from "@/lib/companion/EmotionController";
-import {SCENE_PRESETS,applyScene} from "@/lib/companion/sceneManager";
-import {buildSceneEnvironment} from "@/lib/companion/sceneEnvironments";
+import {forwardRef,useEffect,useImperativeHandle} from "react";
 
-const WARDROBE_MATCHERS={top:/outfit.?top|shirt|tshirt/i,pants:/outfit.?bottom|pants|jeans|legging|trouser/i,dress:/dress|skirt/i,sport:/sport|hoodie|track|sweat/i,formal:/suit|blazer|formal|jacket/i,shoes:/shoe|sneaker|boot/i,accessories:/glass|watch|hat|earring|necklace|bag/i};
+const Character3D=forwardRef(function Character3D({className="",onCapabilities},ref){
+  useImperativeHandle(ref,()=>({
+    zoomToFace(){},
+    resetCamera(){},
+    applyTints(){},
+    applyWardrobe(){},
+    setEmotion(){},
+    applyActivity(){},
+    applyScene(){},
+    exportModel(){}
+  }),[]);
 
-const Character3D=forwardRef(function Character3D({className="",characterId=DEFAULT_CHARACTER_ID,appearance={},wardrobe={},emotion="CALM",activity="idle",scene="sala",speaking=false,mouthIntensity=0,onCapabilities},ref){
- const mountRef=useRef(null),propsRef=useRef({characterId,appearance,wardrobe,emotion,activity,scene,speaking,mouthIntensity,onCapabilities}),apiRef=useRef(null),exportRef=useRef(null);
- const[loading,setLoading]=useState(true),[pending,setPending]=useState(false);
- useEffect(()=>{propsRef.current={characterId,appearance,wardrobe,emotion,activity,scene,speaking,mouthIntensity,onCapabilities};});
- useImperativeHandle(ref,()=>({exportModel:f=>exportRef.current?.(f),zoomToFace:()=>apiRef.current?.zoomToFace(),resetCamera:()=>apiRef.current?.resetCamera()}));
- useEffect(()=>{
-  const mount=mountRef.current;if(!mount)return;let cancelled=false,model=null,env=null,animation=null,emotionCtl=null;
-  const scene3=new THREE.Scene(),w=mount.clientWidth||640,h=mount.clientHeight||480;
-  const camera=new THREE.PerspectiveCamera(38,w/h,.1,100);camera.position.set(0,1.45,3);
-  const renderer=new THREE.WebGLRenderer({antialias:false,alpha:true,powerPreference:"low-power"});renderer.setPixelRatio(1);renderer.setSize(w,h);renderer.shadowMap.enabled=false;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.15;mount.appendChild(renderer.domElement);
-  const dom=renderer.domElement,controls=new OrbitControls(camera,dom);controls.target.set(0,1,0);controls.enableDamping=true;controls.enablePan=false;controls.minDistance=1.2;controls.maxDistance=7;controls.maxPolarAngle=Math.PI*.62;controls.update();
-  scene3.add(new THREE.HemisphereLight(0xeaf2ff,0x30364a,.9));
-  const key=new THREE.DirectionalLight(0xffffff,1.4);key.position.set(3,6,4);key.castShadow=true;key.shadow.mapSize.set(1024,1024);scene3.add(key);
-  const rim=new THREE.DirectionalLight(0x88aaff,.9);rim.position.set(-4,3,-3);scene3.add(rim);
-  const fill=new THREE.DirectionalLight(0xffd9c0,.4);fill.position.set(-2,1.5,3);scene3.add(fill);
-  const platform=new THREE.Mesh(new THREE.CylinderGeometry(1.4,1.55,.1,64),new THREE.MeshStandardMaterial({color:0xeef1f6,roughness:.4,metalness:.1}));platform.position.y=-.05;platform.receiveShadow=true;scene3.add(platform);
-  const ring=new THREE.Mesh(new THREE.TorusGeometry(1.42,.018,16,64),new THREE.MeshStandardMaterial({color:0x6b7a99,metalness:.6,roughness:.3}));ring.rotation.x=Math.PI/2;scene3.add(ring);
-  const morphMeshes=[],wardrobe={top:[],pants:[],dress:[],sport:[],formal:[],shoes:[],accessories:[]},tints={hair:[],top:[],bottom:[]},bones={},rest={};let restHipsY=0;let modelBounds=null;
-  let clips=[];const mouse={x:0,y:0,tx:0,ty:0};const wave={active:false,t:0};const clock=new THREE.Clock();
-  const applySceneNow=()=>{if(env){scene3.remove(env);env.traverse(o=>{o.geometry?.dispose();if(o.material){Array.isArray(o.material)?o.material.forEach(m=>m.dispose()):o.material.dispose();}});}const id=propsRef.current.scene||"sala";applyScene(SCENE_PRESETS[id]||SCENE_PRESETS.sala,{scene:scene3,platform,platformRing:ring});env=buildSceneEnvironment(id);if(env)scene3.add(env);};
-  applySceneNow();
-  const setTint=(ms,hex)=>ms.forEach(m=>{const mats=Array.isArray(m.material)?m.material:[m.material];mats.forEach(mat=>{if(!mat.userData._origColor)mat.userData._origColor=mat.color.clone();if(!("_origMap" in mat.userData))mat.userData._origMap=mat.map;if(hex){mat.map=null;mat.color.set(hex)}else{mat.map=mat.userData._origMap;mat.color.copy(mat.userData._origColor)}mat.needsUpdate=true;});});
-  const selected=CHARACTER_MODELS[propsRef.current.characterId]||CHARACTER_MODELS[DEFAULT_CHARACTER_ID],loader=selected.format==="fbx"?new FBXLoader():new GLTFLoader();
-  const onLoad=asset=>{if(cancelled)return;model=asset.scene||asset;clips=asset.animations||model.animations||[];const b=new THREE.Box3().setFromObject(model),s=b.getSize(new THREE.Vector3());if(s.y>.01){model.scale.multiplyScalar(1.85/s.y);const nb=new THREE.Box3().setFromObject(model),c=nb.getCenter(new THREE.Vector3());model.position.x-=c.x;model.position.z-=c.z;model.position.y-=nb.min.y;modelBounds=new THREE.Box3().setFromObject(model);}
-   model.traverse(o=>{if(o.isBone){bones[o.name]=o;rest[o.name]=o.rotation.clone();}if(o.isMesh){o.castShadow=true;o.frustumCulled=false;const n=(o.name||"").toLowerCase();if(n.includes("hair"))tints.hair.push(o);if(n.includes("outfit_top")||n.includes("outfit.top"))tints.top.push(o);if(n.includes("outfit_bottom")||n.includes("outfit.bottom"))tints.bottom.push(o);for(const [slot,rx] of Object.entries(WARDROBE_MATCHERS))if(rx.test(o.name||""))wardrobe[slot].push(o);if(o.morphTargetDictionary)morphMeshes.push(o);}});
-   if(bones.Hips)restHipsY=bones.Hips.position.y;animation=new AnimationController(model,clips);emotionCtl=new EmotionController(morphMeshes);const act=new ActivityController(animation);
-   const applyTints=()=>{const a=propsRef.current.appearance||{},w=propsRef.current.wardrobe||{};setTint(tints.hair,a.hairColor);setTint(tints.top,w.top?.equipped&&w.top?.color?w.top.color:a.topColor);setTint(tints.bottom,w.pants?.equipped&&w.pants?.color?w.pants.color:a.bottomColor);};
-   const applyWardrobe=()=>Object.entries(wardrobe).forEach(([slot,ms])=>{const cfg=propsRef.current.wardrobe?.[slot]||{};ms.forEach(m=>m.visible=cfg.equipped!==false);});
-   const setEmotion=()=>emotionCtl.setEmotion(propsRef.current.emotion||"CALM");
-   const applyActivity=()=>{const r=act.apply(propsRef.current.activity||"idle",{wave:()=>{wave.active=true;wave.t=0}});if(r.mode!=="clip")Object.keys(rest).forEach(n=>bones[n]?.rotation.copy(rest[n]));};
-   const resetCamera=()=>{camera.position.set(0,1.45,3);controls.target.set(0,1,0);controls.update();};const zoomToFace=()=>{if(!modelBounds)return;const center=modelBounds.getCenter(new THREE.Vector3()),size=modelBounds.getSize(new THREE.Vector3());const faceY=modelBounds.min.y+size.y*.84;controls.target.set(center.x,faceY,center.z);camera.position.set(center.x,faceY+.08,center.z+Math.max(.72,size.y*.48));controls.minDistance=.45;controls.maxDistance=7;controls.update();};apiRef.current={applyTints,applyWardrobe,setEmotion,applyActivity,applyScene:applySceneNow,zoomToFace,resetCamera};applyTints();applyWardrobe();setEmotion();applyActivity();
-   onCapabilities?.({hasModel:true,clips:clips.map(x=>x.name).filter(Boolean),morphs:{smile:morphMeshes.some(m=>findMorph(m.morphTargetDictionary,["mouthsmile"])),frown:morphMeshes.some(m=>findMorph(m.morphTargetDictionary,["mouthfrown"])),jawOpen:morphMeshes.some(m=>findMorph(m.morphTargetDictionary,["jawopen","mouthopen","viseme_aa","visemea"])),blink:morphMeshes.some(m=>findMorph(m.morphTargetDictionary,["eyeblink"]))},wardrobe:Object.fromEntries(Object.entries(wardrobe).map(([k,v])=>[k,v.length>0]))});
-   scene3.add(model);modelBounds=new THREE.Box3().setFromObject(model);setLoading(false);setPending(false);
-  };
-  const failed=()=>{if(cancelled)return;const fallback=selected.fallbackUrl;if(fallback){const fl=selected.fallbackFormat==="fbx"?new FBXLoader():new GLTFLoader();fl.load(fallback,onLoad,undefined,()=>{setLoading(false);setPending(true);onCapabilities?.({hasModel:false,clips:[],morphs:{},wardrobe:{}})});}else{setLoading(false);setPending(true);onCapabilities?.({hasModel:false,clips:[],morphs:{},wardrobe:{}})}};\n  if(selected.format==="multi"&&Array.isArray(selected.urls)){Promise.all(selected.urls.map(url=>new Promise((resolve,reject)=>new GLTFLoader().load(url,resolve,undefined,reject)))).then(parts=>{const group=new THREE.Group();let bodyClips=[];parts.forEach((part,i)=>{const root=part.scene||part;root.traverse(o=>{if(o.isMesh){o.castShadow=true;o.frustumCulled=false;}});if(i===0)bodyClips=part.animations||[];group.add(root);});onLoad({scene:group,animations:bodyClips});}).catch(failed);}else loader.load(selected.url,onLoad,undefined,failed);
-  const onMove=e=>{const r=dom.getBoundingClientRect();mouse.tx=(e.clientX-r.left)/r.width*2-1;mouse.ty=-((e.clientY-r.top)/r.height*2-1)};window.addEventListener("mousemove",onMove);
-  const onClick=e=>{if(!model)return;const r=dom.getBoundingClientRect(),p=new THREE.Vector2((e.clientX-r.left)/r.width*2-1,-((e.clientY-r.top)/r.height*2-1)),ray=new THREE.Raycaster();ray.setFromCamera(p,camera);if(ray.intersectObject(model,true).length){wave.active=true;wave.t=0}};dom.addEventListener("click",onClick);
-  const resize=()=>{const W=mount.clientWidth||640,H=mount.clientHeight||480;camera.aspect=W/H;camera.updateProjectionMatrix();renderer.setSize(W,H)};window.addEventListener("resize",resize);
-  exportRef.current=format=>{if(!model)return;new GLTFExporter().parse(model,result=>{const blob=format==="glb"?new Blob([result],{type:"model/gltf-binary"}):new Blob([JSON.stringify(result,null,2)],{type:"model/gltf+json"});const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=`personaje.${format}`;a.click();URL.revokeObjectURL(url)},console.error,{binary:format==="glb",animations:clips})};
-  let raf;const animate=()=>{const d=Math.min(clock.getDelta(),.05),t=clock.elapsedTime;mouse.x+=(mouse.tx-mouse.x)*.08;mouse.y+=(mouse.ty-mouse.y)*.08;if(model&&!(animation?.playing)){if(bones.Head){bones.Head.rotation.y=(rest.Head?.y||0)+mouse.x*.35;bones.Head.rotation.x=(rest.Head?.x||0)-mouse.y*.15;}if(wave.active&&bones.RightArm){wave.t+=d;const e=Math.min(1,Math.sin(Math.PI*Math.min(wave.t/2.6,1)));bones.RightArm.rotation.z=(rest.RightArm?.z||0)-e*1.7;if(wave.t>=2.6){wave.active=false;bones.RightArm.rotation.copy(rest.RightArm||bones.RightArm.rotation);}}}animation?.update(d);emotionCtl?.update(d);if(morphMeshes.length){const p=propsRef.current.speaking?(propsRef.current.mouthIntensity||.2)*(.55+.45*Math.sin(t*12)):0;for(const m of morphMeshes){const h=findMorph(m.morphTargetDictionary,["jawopen","jaw_open","mouthopen","mouth_open","viseme_aa","visemea","viseme_aa_open","A"]);if(h&&m.morphTargetInfluences)m.morphTargetInfluences[h.index]+=(p-m.morphTargetInfluences[h.index])*Math.min(1,d*14)}}controls.update();renderer.render(scene3,camera);raf=requestAnimationFrame(animate)};animate();
-  return()=>{cancelled=true;cancelAnimationFrame(raf);window.removeEventListener("mousemove",onMove);window.removeEventListener("resize",resize);dom.removeEventListener("click",onClick);controls.dispose();animation?.stop();renderer.dispose();scene3.traverse(o=>{o.geometry?.dispose();if(o.material)Array.isArray(o.material)?o.material.forEach(m=>m.dispose()):o.material.dispose()});if(dom.parentNode===mount)mount.removeChild(dom);apiRef.current=null;exportRef.current=null};
- },[characterId]);
- useEffect(()=>apiRef.current?.applyTints(),[appearance]);useEffect(()=>apiRef.current?.applyWardrobe(),[wardrobe]);useEffect(()=>apiRef.current?.setEmotion(),[emotion]);useEffect(()=>apiRef.current?.applyActivity(),[activity]);useEffect(()=>{if(!apiRef.current)return;apiRef.current.applyScene?.()},[scene]);
- return <div className={`relative ${className}`} style={{width:"100%",height:"100%"}}><div ref={mountRef} className="w-full h-full"/>{loading&&<div className="absolute inset-0 flex items-center justify-center"><div className="w-8 h-8 border-4 border-slate-300 border-t-slate-700 rounded-full animate-spin"/></div>}{pending&&<div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 gap-2"><span className="text-sm font-semibold text-slate-700">Modelo 3D pendiente</span><p className="text-xs text-slate-500 max-w-xs">No se pudo cargar el avatar seleccionado. Los archivos deben estar en <code>public/models</code>.</p></div>}</div>;
+  useEffect(()=>{
+    onCapabilities?.({
+      hasModel:false,
+      clips:[],
+      morphs:{},
+      wardrobe:{},
+      diagnostic:"webgl-disabled"
+    });
+  },[onCapabilities]);
+
+  return (
+    <div className={className} style={{
+      width:"100%",
+      height:"100%",
+      minHeight:260,
+      display:"grid",
+      placeItems:"center",
+      background:"linear-gradient(180deg,#f8fafc,#eef2f7)",
+      color:"#475569",
+      fontFamily:"system-ui,sans-serif"
+    }}>
+      <div style={{textAlign:"center",padding:24,maxWidth:420}}>
+        <div style={{fontSize:42,marginBottom:12}}>3D</div>
+        <strong style={{display:"block",fontSize:18,color:"#0f172a"}}>
+          Virtual Companion AI
+        </strong>
+        <span style={{display:"block",marginTop:8,fontSize:13}}>
+          3D viewer temporarily disabled for diagnosis.
+        </span>
+        <span style={{display:"block",marginTop:8,fontSize:12,color:"#64748b"}}>
+          Diagnostic test: Three.js/WebGL is not being created.
+        </span>
+      </div>
+    </div>
+  );
 });
+
 export default Character3D;
