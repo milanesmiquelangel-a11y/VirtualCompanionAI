@@ -22,7 +22,7 @@ const Character3D=forwardRef(function Character3D({className="",characterId=DEFA
   const mount=mountRef.current;if(!mount)return;let cancelled=false,model=null,env=null,animation=null,emotionCtl=null;
   const scene3=new THREE.Scene(),w=mount.clientWidth||640,h=mount.clientHeight||480;
   const camera=new THREE.PerspectiveCamera(38,w/h,.1,100);camera.position.set(0,1.45,3);
-  const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(w,h);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.15;mount.appendChild(renderer.domElement);
+  const renderer=new THREE.WebGLRenderer({antialias:false,alpha:true,powerPreference:"low-power"});renderer.setPixelRatio(1);renderer.setSize(w,h);renderer.shadowMap.enabled=false;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.15;mount.appendChild(renderer.domElement);
   const dom=renderer.domElement,controls=new OrbitControls(camera,dom);controls.target.set(0,1,0);controls.enableDamping=true;controls.enablePan=false;controls.minDistance=1.2;controls.maxDistance=7;controls.maxPolarAngle=Math.PI*.62;controls.update();
   scene3.add(new THREE.HemisphereLight(0xeaf2ff,0x30364a,.9));
   const key=new THREE.DirectionalLight(0xffffff,1.4);key.position.set(3,6,4);key.castShadow=true;key.shadow.mapSize.set(1024,1024);scene3.add(key);
