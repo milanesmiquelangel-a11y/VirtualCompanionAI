@@ -40,6 +40,11 @@ const Character3D=forwardRef(function Character3D({className="",onCapabilities},
     const mount=mountRef.current;if(!mount)return;
     let renderer=null,model=null,animationController=null,controls=null,environment=null,raf=0,disposed=false;
     const morphMeshes=[];
+    const bones={};
+    const rest={};
+    let restHipsY=0;
+    let nextBlink=2.5;
+    let blinkT=-1;
     const showError=(title,detail)=>{
       mount.innerHTML="";
       const box=document.createElement("div");
@@ -135,7 +140,7 @@ const Character3D=forwardRef(function Character3D({className="",onCapabilities},
 
         let boneCount=0,meshCount=0,morphCount=0;
         model.traverse(o=>{
-          if(o.isBone)boneCount++;
+          if(o.isBone){bones[o.name]=o;boneCount++;}
           if(!o.isMesh)return;
           meshCount++;
           if(!o.morphTargetDictionary)return;
@@ -150,6 +155,8 @@ const Character3D=forwardRef(function Character3D({className="",onCapabilities},
             brow:findMorph(o,["browInnerUp"])
           });
         });
+        ["Hips","Spine","Spine1","Spine2","Neck","Head"].forEach(name=>{if(bones[name])rest[name]=bones[name].rotation.clone();});
+        if(bones.Hips)restHipsY=bones.Hips.position.y;
         scene.add(model);
         onCapabilities?.({
           hasModel:true,
@@ -170,6 +177,26 @@ const Character3D=forwardRef(function Character3D({className="",onCapabilities},
         const delta=clock.getDelta();
         const t=clock.elapsedTime;
         animationController?.update(delta);
+
+        // Movimiento corporal sutil: respiración y balanceo.
+        // Se limita a huesos que realmente existen en el GLB.
+        if(model){
+          if(bones.Spine2&&rest.Spine2) bones.Spine2.rotation.x=rest.Spine2.x+Math.sin(t*1.35)*0.012;
+          if(bones.Spine1&&rest.Spine1) bones.Spine1.rotation.y=rest.Spine1.y+Math.sin(t*0.65)*0.018;
+          if(bones.Hips&&rest.Hips) {
+            bones.Hips.position.y=restHipsY+Math.sin(t*1.35)*0.004;
+            bones.Hips.rotation.y=rest.Hips.y+Math.sin(t*0.4)*0.015;
+          }
+          // Movimiento suave de cabeza: no depende de mouse y no altera el diagnóstico facial.
+          if(bones.Head&&rest.Head){
+            bones.Head.rotation.y=rest.Head.y+Math.sin(t*0.45)*0.035;
+            bones.Head.rotation.x=rest.Head.x+Math.sin(t*0.32)*0.012;
+          }
+          if(bones.Neck&&rest.Neck){
+            bones.Neck.rotation.y=rest.Neck.y+Math.sin(t*0.45)*0.015;
+          }
+        }
+
         controls?.update();
         const phase=t%15;
         let label="NEUTRAL",smile=0,jaw=0,brow=0,blink=0;
