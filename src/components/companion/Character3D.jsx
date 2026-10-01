@@ -2,12 +2,28 @@ import {forwardRef,useEffect,useImperativeHandle,useRef} from "react";
 import * as THREE from "three";
 import {GLTFLoader} from "three/examples/jsm/loaders/GLTFLoader.js";
 
+const findMorph=(mesh,names)=>{
+  const dict=mesh?.morphTargetDictionary;
+  if(!dict)return null;
+  const entries=Object.entries(dict);
+  for(const wanted of names){
+    const hit=entries.find(([name])=>name.toLowerCase()===wanted.toLowerCase());
+    if(hit)return hit[1];
+  }
+  for(const wanted of names){
+    const hit=entries.find(([name])=>name.toLowerCase().includes(wanted.toLowerCase()));
+    if(hit)return hit[1];
+  }
+  return null;
+};
+
 const Character3D=forwardRef(function Character3D({className="",onCapabilities},ref){
   const mountRef=useRef(null);
   useImperativeHandle(ref,()=>({zoomToFace(){},resetCamera(){},exportModel(){}}),[]);
   useEffect(()=>{
     const mount=mountRef.current;if(!mount)return;
     let renderer=null,model=null,raf=0,disposed=false;
+    const morphMeshes=[];
     const showError=(title,detail)=>{
       mount.innerHTML="";
       const box=document.createElement("div");
@@ -43,25 +59,35 @@ const Character3D=forwardRef(function Character3D({className="",onCapabilities},
           model.position.z-=center.z;
           model.position.y-=nb.min.y;
         }
-        scene.add(model);
-        const morphs={};
-        let morphCount=0,boneCount=0,meshCount=0;
+
+        let boneCount=0,meshCount=0,morphCount=0;
         model.traverse(o=>{
           if(o.isBone)boneCount++;
-          if(o.isMesh){
-            meshCount++;
-            if(o.morphTargetDictionary){
-              morphs[o.name||("mesh"+meshCount)]=Object.keys(o.morphTargetDictionary);
-              morphCount+=Object.keys(o.morphTargetDictionary).length;
-            }
+          if(!o.isMesh)return;
+          meshCount++;
+          if(o.morphTargetDictionary){
+            const names=Object.keys(o.morphTargetDictionary);
+            morphCount+=names.length;
+            morphMeshes.push({
+              mesh:o,
+              smile:findMorph(o,["mouthSmile"]),
+              frownLeft:findMorph(o,["mouthFrownLeft"]),
+              frownRight:findMorph(o,["mouthFrownRight"]),
+              jawOpen:findMorph(o,["jawOpen","mouthOpen"]),
+              blinkLeft:findMorph(o,["eyeBlinkLeft"]),
+              blinkRight:findMorph(o,["eyeBlinkRight"]),
+              brow:findMorph(o,["browInnerUp"])
+            });
           }
         });
+
+        scene.add(model);
         onCapabilities?.({
           hasModel:true,
           clips:(gltf.animations||[]).map(x=>x.name).filter(Boolean),
-          morphs,
+          morphs:Object.fromEntries(morphMeshes.map((x,i)=>[x.mesh.name||("mesh"+i),Object.keys(x.mesh.morphTargetDictionary||{})])),
           wardrobe:{},
-          diagnostic:"glb-basic-loaded",
+          diagnostic:"glb-morph-test",
           bones:boneCount,
           meshes:meshCount,
           morphCount
@@ -74,14 +100,33 @@ const Character3D=forwardRef(function Character3D({className="",onCapabilities},
       const clock=new THREE.Clock();
       const animate=()=>{
         if(disposed)return;
-        if(model)model.rotation.y=clock.getElapsedTime()*.15;
+        const t=clock.getElapsedTime();
+        if(model)model.rotation.y=t*.12;
+
+        // Isolated facial morph test: smile, blink, brow and jaw.
+        const cycle=t%12;
+        const smile=Math.max(0,Math.sin((cycle-1)*Math.PI/4))*0.75;
+        const jaw=cycle>4&&cycle<6?Math.sin((cycle-4)*Math.PI/2)*0.65:0;
+        const brow=cycle>7&&cycle<9?Math.sin((cycle-7)*Math.PI/2)*0.55:0;
+        const blink=cycle>10&&cycle<10.35?Math.sin((cycle-10)*Math.PI/0.35):0;
+
+        for(const item of morphMeshes){
+          const a=item.mesh.morphTargetInfluences;
+          if(!a)continue;
+          if(item.smile!==null)a[item.smile]=smile;
+          if(item.jawOpen!==null)a[item.jawOpen]=jaw;
+          if(item.brow!==null)a[item.brow]=brow;
+          if(item.blinkLeft!==null)a[item.blinkLeft]=Math.max(0,blink);
+          if(item.blinkRight!==null)a[item.blinkRight]=Math.max(0,blink);
+        }
+
         renderer.render(scene,camera);
         raf=requestAnimationFrame(animate);
       };
       animate();
     }catch(error){
-      console.error("GLB diagnostic failed:",error);
-      showError("GLB diagnostic failed",String(error?.message||error));
+      console.error("GLB morph diagnostic failed:",error);
+      showError("GLB morph diagnostic failed",String(error?.message||error));
     }
     return()=>{
       disposed=true;
