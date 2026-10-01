@@ -3,6 +3,7 @@ import * as THREE from "three";
 import {GLTFLoader} from "three/examples/jsm/loaders/GLTFLoader.js";
 import {AnimationController} from "../../lib/companion/AnimationController.js";
 import {OrbitControls} from "three/examples/jsm/controls/OrbitControls.js";
+import {buildSceneEnvironment} from "../../lib/companion/sceneEnvironments.js";
 
 const findMorph=(mesh,names)=>{
   const dict=mesh?.morphTargetDictionary;if(!dict)return null;
@@ -23,7 +24,7 @@ const Character3D=forwardRef(function Character3D({className="",onCapabilities},
   useImperativeHandle(ref,()=>({zoomToFace(){},resetCamera(){},exportModel(){}}),[]);
   useEffect(()=>{
     const mount=mountRef.current;if(!mount)return;
-    let renderer=null,model=null,animationController=null,controls=null,raf=0,disposed=false;
+    let renderer=null,model=null,animationController=null,controls=null,environment=null,raf=0,disposed=false;
     const morphMeshes=[];
     const showError=(title,detail)=>{
       mount.innerHTML="";
@@ -43,6 +44,8 @@ const Character3D=forwardRef(function Character3D({className="",onCapabilities},
       controls=new OrbitControls(camera,renderer.domElement);
       controls.enableDamping=false;controls.enablePan=false;controls.enableZoom=false;
       controls.target.set(0,1.18,0);controls.update();
+      environment=buildSceneEnvironment("sala");
+      if(environment){environment.position.z=-.35;scene.add(environment);}
       scene.add(new THREE.HemisphereLight(0xffffff,0x64748b,2));
       const key=new THREE.DirectionalLight(0xffffff,2.2);key.position.set(2,4,3);scene.add(key);
 
@@ -84,7 +87,7 @@ const Character3D=forwardRef(function Character3D({className="",onCapabilities},
           hasModel:true,
           clips:(gltf.animations||[]).map(x=>x.name).filter(Boolean),
           morphs:Object.fromEntries(morphMeshes.map((x,i)=>[x.mesh.name||("mesh"+i),Object.keys(x.mesh.morphTargetDictionary||{})])),
-          wardrobe:{},diagnostic:"glb-animation-controller-orbit-test",
+          wardrobe:{},diagnostic:"glb-animation-controller-orbit-environment-test",
           bones:boneCount,meshes:meshCount,morphCount
         });
         status.textContent="AnimationController OK • clips: "+(gltf.animations||[]).length;
@@ -127,6 +130,7 @@ const Character3D=forwardRef(function Character3D({className="",onCapabilities},
       disposed=true;cancelAnimationFrame(raf);
       animationController?.stop();
       controls?.dispose();
+      if(environment)environment.traverse(o=>{o.geometry?.dispose();if(o.material)o.material.dispose();});
       if(model)model.traverse(o=>{o.geometry?.dispose();if(o.material)Array.isArray(o.material)?o.material.forEach(m=>m.dispose()):o.material.dispose()});
       renderer?.dispose();
       if(renderer?.domElement.parentNode===mount)mount.removeChild(renderer.domElement);
