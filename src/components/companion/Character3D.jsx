@@ -42,7 +42,7 @@ const Character3D=forwardRef(function Character3D({className="",onCapabilities},
       renderer=new THREE.WebGLRenderer({antialias:false,alpha:false,powerPreference:"low-power"});
       renderer.setPixelRatio(1);renderer.setSize(width,height);mount.appendChild(renderer.domElement);
       controls=new OrbitControls(camera,renderer.domElement);
-      controls.enableDamping=false;controls.enablePan=false;controls.enableZoom=false;
+      controls.enableDamping=false;controls.enablePan=false;controls.enableZoom=true;controls.minDistance=2.0;controls.maxDistance=5.0;
       controls.target.set(0,1.18,0);controls.update();
       environment=buildSceneEnvironment("sala");
       if(environment){environment.position.z=-.35;scene.add(environment);}
@@ -87,7 +87,7 @@ const Character3D=forwardRef(function Character3D({className="",onCapabilities},
           hasModel:true,
           clips:(gltf.animations||[]).map(x=>x.name).filter(Boolean),
           morphs:Object.fromEntries(morphMeshes.map((x,i)=>[x.mesh.name||("mesh"+i),Object.keys(x.mesh.morphTargetDictionary||{})])),
-          wardrobe:{},diagnostic:"glb-animation-controller-orbit-environment-test",
+          wardrobe:{},diagnostic:"glb-animation-controller-orbit-environment-zoom-test",
           bones:boneCount,meshes:meshCount,morphCount
         });
         status.textContent="AnimationController OK • clips: "+(gltf.animations||[]).length;
