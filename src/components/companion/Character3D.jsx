@@ -21,7 +21,21 @@ const findMorph=(mesh,names)=>{
 
 const Character3D=forwardRef(function Character3D({className="",onCapabilities},ref){
   const mountRef=useRef(null);
-  useImperativeHandle(ref,()=>({zoomToFace(){},resetCamera(){},exportModel(){}}),[]);
+  useImperativeHandle(ref,()=>({
+    zoomToFace(){
+      if(!controls)return;
+      controls.target.set(0,1.58,0);
+      camera.position.set(0,1.58,1.15);
+      controls.update();
+    },
+    resetCamera(){
+      if(!controls)return;
+      controls.target.set(0,1.18,0);
+      camera.position.set(0,1.42,3.05);
+      controls.update();
+    },
+    exportModel(){}
+  }),[]);
   useEffect(()=>{
     const mount=mountRef.current;if(!mount)return;
     let renderer=null,model=null,animationController=null,controls=null,environment=null,raf=0,disposed=false;
@@ -42,8 +56,26 @@ const Character3D=forwardRef(function Character3D({className="",onCapabilities},
       renderer=new THREE.WebGLRenderer({antialias:false,alpha:false,powerPreference:"low-power"});
       renderer.setPixelRatio(1);renderer.setSize(width,height);mount.appendChild(renderer.domElement);
       controls=new OrbitControls(camera,renderer.domElement);
-      controls.enableDamping=false;controls.enablePan=false;controls.enableZoom=true;controls.minDistance=2.0;controls.maxDistance=5.0;
+      controls.enableDamping=false;controls.enablePan=false;controls.enableZoom=true;controls.zoomSpeed=1.25;controls.minDistance=.65;controls.maxDistance=5.5;
       controls.target.set(0,1.18,0);controls.update();
+      let faceZoomed=false,lastTap=0;
+      const toggleFaceZoom=()=>{
+        faceZoomed=!faceZoomed;
+        if(faceZoomed){
+          controls.target.set(0,1.58,0);
+          camera.position.set(0,1.58,1.15);
+        }else{
+          controls.target.set(0,1.18,0);
+          camera.position.set(0,1.42,3.05);
+        }
+        controls.update();
+      };
+      const handleDoubleTap=()=>{
+        const now=performance.now();
+        if(now-lastTap<350)toggleFaceZoom();
+        lastTap=now;
+      };
+      mount.addEventListener("pointerup",handleDoubleTap);
       environment=buildSceneEnvironment("sala");
       if(environment){environment.position.z=-.35;scene.add(environment);}
       scene.add(new THREE.HemisphereLight(0xffffff,0x64748b,2));
@@ -87,7 +119,7 @@ const Character3D=forwardRef(function Character3D({className="",onCapabilities},
           hasModel:true,
           clips:(gltf.animations||[]).map(x=>x.name).filter(Boolean),
           morphs:Object.fromEntries(morphMeshes.map((x,i)=>[x.mesh.name||("mesh"+i),Object.keys(x.mesh.morphTargetDictionary||{})])),
-          wardrobe:{},diagnostic:"glb-animation-controller-orbit-environment-zoom-test",
+          wardrobe:{},diagnostic:"glb-animation-controller-orbit-environment-face-zoom-test",
           bones:boneCount,meshes:meshCount,morphCount
         });
         status.textContent="AnimationController OK • clips: "+(gltf.animations||[]).length;
@@ -129,6 +161,7 @@ const Character3D=forwardRef(function Character3D({className="",onCapabilities},
     return()=>{
       disposed=true;cancelAnimationFrame(raf);
       animationController?.stop();
+      mount.removeEventListener("pointerup",handleDoubleTap);
       controls?.dispose();
       if(environment)environment.traverse(o=>{o.geometry?.dispose();if(o.material)o.material.dispose();});
       if(model)model.traverse(o=>{o.geometry?.dispose();if(o.material)Array.isArray(o.material)?o.material.forEach(m=>m.dispose()):o.material.dispose()});
