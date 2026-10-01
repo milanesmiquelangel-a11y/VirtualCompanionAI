@@ -50,11 +50,18 @@ const Character3D=forwardRef(function Character3D({className="",onCapabilities},
     try{
       const width=mount.clientWidth||640,height=mount.clientHeight||480;
       const scene=new THREE.Scene();scene.background=new THREE.Color(0xf8fafc);
-      const camera=new THREE.PerspectiveCamera(32,width/height,.1,100);
+      const camera=new THREE.PerspectiveCamera(28,width/height,.1,100);
       camera.position.set(0,1.42,3.05);
       camera.lookAt(0,1.18,0);
-      renderer=new THREE.WebGLRenderer({antialias:false,alpha:false,powerPreference:"low-power"});
-      renderer.setPixelRatio(1);renderer.setSize(width,height);mount.appendChild(renderer.domElement);
+      renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:"high-performance"});
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.5));
+      renderer.setSize(width,height);
+      renderer.outputColorSpace=THREE.SRGBColorSpace;
+      renderer.toneMapping=THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure=1.08;
+      renderer.shadowMap.enabled=true;
+      renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+      mount.appendChild(renderer.domElement);
       controls=new OrbitControls(camera,renderer.domElement);
       controls.enableDamping=false;controls.enablePan=false;controls.enableZoom=true;controls.zoomSpeed=1.25;controls.minDistance=.65;controls.maxDistance=5.5;
       controls.target.set(0,1.18,0);controls.update();
@@ -78,8 +85,20 @@ const Character3D=forwardRef(function Character3D({className="",onCapabilities},
       mount.addEventListener("pointerup",handleDoubleTap);
       environment=buildSceneEnvironment("sala");
       if(environment){environment.position.z=-.35;scene.add(environment);}
-      scene.add(new THREE.HemisphereLight(0xffffff,0x64748b,2));
-      const key=new THREE.DirectionalLight(0xffffff,2.2);key.position.set(2,4,3);scene.add(key);
+      const hemi=new THREE.HemisphereLight(0xfff8f0,0x46515f,1.55);scene.add(hemi);
+      const key=new THREE.DirectionalLight(0xfff3e6,2.4);
+      key.position.set(2.5,3.8,3.5);
+      key.castShadow=true;
+      key.shadow.mapSize.set(1024,1024);
+      key.shadow.camera.near=.5;
+      key.shadow.camera.far=12;
+      scene.add(key);
+      const fill=new THREE.DirectionalLight(0xdce9ff,1.15);
+      fill.position.set(-3,2.4,2);
+      scene.add(fill);
+      const rim=new THREE.DirectionalLight(0xffe4c4,.9);
+      rim.position.set(0,3,-3);
+      scene.add(rim);
 
       const status=document.createElement("div");
       status.style.cssText="position:absolute;left:12px;top:12px;padding:7px 10px;border-radius:8px;background:rgba(15,23,42,.82);color:white;font:600 13px system-ui,sans-serif;z-index:2;pointer-events:none";
@@ -96,6 +115,23 @@ const Character3D=forwardRef(function Character3D({className="",onCapabilities},
           const nb=new THREE.Box3().setFromObject(model),center=nb.getCenter(new THREE.Vector3());
           model.position.x-=center.x;model.position.z-=center.z;model.position.y-=nb.min.y;
         }
+        model.traverse(o=>{
+          if(!o.isMesh)return;
+          o.castShadow=true;
+          o.receiveShadow=true;
+          const materials=Array.isArray(o.material)?o.material:[o.material];
+          for(const material of materials){
+            if(!material)continue;
+            material.needsUpdate=true;
+            const n=(material.name||"").toLowerCase();
+            if(n.includes("skin")||n.includes("body")||n.includes("face")||n.includes("head")){
+              if("roughness" in material)material.roughness=.58;
+              if("metalness" in material)material.metalness=0;
+            }else{
+              if("roughness" in material)material.roughness=Math.max(.35,Math.min(material.roughness||.7,.82));
+            }
+          }
+        });
 
         let boneCount=0,meshCount=0,morphCount=0;
         model.traverse(o=>{
@@ -119,7 +155,7 @@ const Character3D=forwardRef(function Character3D({className="",onCapabilities},
           hasModel:true,
           clips:(gltf.animations||[]).map(x=>x.name).filter(Boolean),
           morphs:Object.fromEntries(morphMeshes.map((x,i)=>[x.mesh.name||("mesh"+i),Object.keys(x.mesh.morphTargetDictionary||{})])),
-          wardrobe:{},diagnostic:"glb-animation-controller-orbit-environment-face-zoom-test",
+          wardrobe:{},diagnostic:"glb-humanization-lighting-test",
           bones:boneCount,meshes:meshCount,morphCount
         });
         status.textContent="AnimationController OK • clips: "+(gltf.animations||[]).length;
