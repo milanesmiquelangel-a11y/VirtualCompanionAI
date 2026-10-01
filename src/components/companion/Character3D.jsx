@@ -1,6 +1,7 @@
 import {forwardRef,useEffect,useImperativeHandle,useRef} from "react";
 import * as THREE from "three";
 import {GLTFLoader} from "three/examples/jsm/loaders/GLTFLoader.js";
+import {AnimationController} from "../../lib/companion/AnimationController.js";
 
 const findMorph=(mesh,names)=>{
   const dict=mesh?.morphTargetDictionary;if(!dict)return null;
@@ -21,7 +22,7 @@ const Character3D=forwardRef(function Character3D({className="",onCapabilities},
   useImperativeHandle(ref,()=>({zoomToFace(){},resetCamera(){},exportModel(){}}),[]);
   useEffect(()=>{
     const mount=mountRef.current;if(!mount)return;
-    let renderer=null,model=null,raf=0,disposed=false;
+    let renderer=null,model=null,animationController=null,raf=0,disposed=false;
     const morphMeshes=[];
     const showError=(title,detail)=>{
       mount.innerHTML="";
@@ -49,6 +50,7 @@ const Character3D=forwardRef(function Character3D({className="",onCapabilities},
       new GLTFLoader().load("/models/companion.glb",gltf=>{
         if(disposed)return;
         model=gltf.scene;
+        animationController=new AnimationController(model,gltf.animations||[]);
         const bounds=new THREE.Box3().setFromObject(model),size=bounds.getSize(new THREE.Vector3());
         if(size.y>.01){
           model.scale.multiplyScalar(1.85/size.y);
@@ -78,10 +80,10 @@ const Character3D=forwardRef(function Character3D({className="",onCapabilities},
           hasModel:true,
           clips:(gltf.animations||[]).map(x=>x.name).filter(Boolean),
           morphs:Object.fromEntries(morphMeshes.map((x,i)=>[x.mesh.name||("mesh"+i),Object.keys(x.mesh.morphTargetDictionary||{})])),
-          wardrobe:{},diagnostic:"glb-single-expression-test",
+          wardrobe:{},diagnostic:"glb-animation-controller-test",
           bones:boneCount,meshes:meshCount,morphCount
         });
-        status.textContent="Expresiones detectadas: "+morphCount;
+        status.textContent="AnimationController OK • clips: "+(gltf.animations||[]).length;
       },undefined,error=>{
         console.error("GLB load failed:",error);
         showError("GLB model failed","The Ready Player Me model could not be loaded or parsed.");
@@ -90,7 +92,9 @@ const Character3D=forwardRef(function Character3D({className="",onCapabilities},
       const clock=new THREE.Clock();
       const animate=()=>{
         if(disposed)return;
-        const t=clock.getElapsedTime();
+        const delta=clock.getDelta();
+        const t=clock.elapsedTime;
+        animationController?.update(delta);
         const phase=t%15;
         let label="NEUTRAL",smile=0,jaw=0,brow=0,blink=0;
         if(phase>=2&&phase<5){label="SMILE";smile=.9;}
@@ -116,6 +120,7 @@ const Character3D=forwardRef(function Character3D({className="",onCapabilities},
     }
     return()=>{
       disposed=true;cancelAnimationFrame(raf);
+      animationController?.stop();
       if(model)model.traverse(o=>{o.geometry?.dispose();if(o.material)Array.isArray(o.material)?o.material.forEach(m=>m.dispose()):o.material.dispose()});
       renderer?.dispose();
       if(renderer?.domElement.parentNode===mount)mount.removeChild(renderer.domElement);
