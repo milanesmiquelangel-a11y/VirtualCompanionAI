@@ -1,9 +1,11 @@
 import {forwardRef,useEffect,useImperativeHandle,useRef} from "react";
 import * as THREE from "three";
 import {GLTFLoader} from "three/examples/jsm/loaders/GLTFLoader.js";
+import {FBXLoader} from "three/examples/jsm/loaders/FBXLoader.js";
 import {AnimationController} from "../../lib/companion/AnimationController.js";
 import {OrbitControls} from "three/examples/jsm/controls/OrbitControls.js";
 import {buildSceneEnvironment} from "../../lib/companion/sceneEnvironments.js";
+import {MODEL_URL,FALLBACK_MODEL_URL} from "../../lib/companion/companionConfig.js";
 
 const findMorph=(mesh,names)=>{
   const dict=mesh?.morphTargetDictionary;
@@ -162,11 +164,21 @@ const Character3D=forwardRef(function Character3D({className="",onCapabilities},
       mount.style.position="relative";
       mount.appendChild(status);
 
-      new GLTFLoader().load("/models/companion.glb",gltf=>{
+      const loadAsset=(url,onLoad,onError)=>{
+        const isFbx=/\\.fbx(?:$|\\?)/i.test(url);
+        if(isFbx){
+          new FBXLoader().load(url,object=>onLoad({scene:object,animations:object.animations||[]}),undefined,onError);
+        }else{
+          new GLTFLoader().load(url,onLoad,undefined,onError);
+        }
+      };
+
+      const handleLoadedAsset=(asset)=>{
         if(disposed)return;
 
-        model=gltf.scene;
-        animationController=new AnimationController(model,gltf.animations||[]);
+        model=asset.scene||asset;
+        const clips=asset.animations||[];
+        animationController=new AnimationController(model,clips);
 
         const bounds=new THREE.Box3().setFromObject(model);
         const size=bounds.getSize(new THREE.Vector3());
@@ -253,7 +265,7 @@ const Character3D=forwardRef(function Character3D({className="",onCapabilities},
 
         onCapabilities?.({
           hasModel:true,
-          clips:(gltf.animations||[]).map(x=>x.name).filter(Boolean),
+          clips:clips.map(x=>x.name).filter(Boolean),
           morphs:Object.fromEntries(
             morphMeshes.map((x,i)=>[
               x.mesh.name||("mesh"+i),
@@ -266,10 +278,24 @@ const Character3D=forwardRef(function Character3D({className="",onCapabilities},
           meshes:meshCount,
           morphCount
         });
-      },undefined,error=>{
-        console.error("GLB load failed:",error);
-        showError("GLB model failed","The Ready Player Me model could not be loaded or parsed.");
-      });
+      };
+
+      const handleLoadError=(error)=>{
+        console.error("3D model load failed:",error);
+        if(FALLBACK_MODEL_URL && FALLBACK_MODEL_URL!==MODEL_URL){
+          loadAsset(FALLBACK_MODEL_URL,handleLoadedAsset,finalError);
+          return;
+        }
+        finalError(error);
+      };
+
+      const finalError=(error)=>{
+        console.error("3D model fallback failed:",error);
+        showError("3D model failed","The configured companion model could not be loaded or parsed.");
+        onCapabilities?.({hasModel:false,clips:[],morphs:{},wardrobe:{},diagnostic:"load-failed",bones:0,meshes:0,morphCount:0});
+      };
+
+      loadAsset(MODEL_URL,handleLoadedAsset,handleLoadError);
 
       const clock=new THREE.Clock();
       let blinkStart=-1;
