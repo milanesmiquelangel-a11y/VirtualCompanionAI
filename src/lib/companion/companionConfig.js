@@ -1,4 +1,4 @@
-export const MODEL_URL="https://github.com/milanesmiquelangel-a11y/VirtualCompanionAI/releases/latest/download/model-5.glb";
+export const MODEL_URL="/models/model-5.glb";
 export const FALLBACK_MODEL_URL="/models/companion-female.fbx";
 export const CHARACTER_MODELS={female:{id:"female",label:"Compañera",description:"Humana digital realista CC0",url:"/models/companion-female.fbx",format:"fbx"},male:{id:"male",label:"Compañero",description:"Avatar masculino adulto",url:"/models/companion-male.glb",format:"glb"}};
 export const DEFAULT_CHARACTER_ID="female";
