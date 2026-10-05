@@ -3,8 +3,8 @@ import { createWriteStream } from "node:fs";
 import { Readable } from "node:stream";
 import { finished } from "node:stream/promises";
 
-const url = "https://github.com/milanesmiquelangel-a11y/VirtualCompanionAI/releases/latest/download/model-5.glb";
-const output = "public/models/model-5.glb";
+const url = "https://github.com/milanesmiquelangel-a11y/VirtualCompanionAI/releases/latest/download/model.5.glb";
+const output = "public/models/model.5.glb";
 
 await mkdir("public/models", { recursive: true });
 
