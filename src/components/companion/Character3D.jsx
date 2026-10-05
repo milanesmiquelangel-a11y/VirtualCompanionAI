@@ -165,7 +165,7 @@ const Character3D=forwardRef(function Character3D({className="",onCapabilities},
       mount.appendChild(status);
 
       const loadAsset=(url,onLoad,onError)=>{
-        const isFbx=/\\.fbx(?:$|\\?)/i.test(url);
+        const isFbx=/\.fbx(?:$|\?)/i.test(url);
         if(isFbx){
           new FBXLoader().load(url,object=>onLoad({scene:object,animations:object.animations||[]}),undefined,onError);
         }else{
